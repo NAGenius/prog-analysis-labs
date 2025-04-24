@@ -24,8 +24,10 @@ package pascal.taie.analysis.dataflow.inter;
 
 import pascal.taie.analysis.dataflow.fact.DataflowResult;
 import pascal.taie.analysis.graph.icfg.ICFG;
+import pascal.taie.analysis.graph.icfg.ICFGEdge;
 import pascal.taie.util.collection.SetQueue;
 
+import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -58,11 +60,42 @@ class InterSolver<Method, Node, Fact> {
         return result;
     }
 
+    /**
+     * ICFG 初始化
+     */
     private void initialize() {
         // TODO - finish me
+        // 遍历每一个节点, 初始化为空集合 (fact)
+        for (Node node : icfg.getNodes()) {
+            result.setInFact(node, analysis.newInitialFact());
+            result.setOutFact(node, analysis.newInitialFact());
+        }
+        // 遍历每一个入口方法, 初始化为边界 fact
+        for(Method m: icfg.entryMethods().toList()) {
+            Node n = icfg.getEntryOf(m);
+            result.setInFact(n, analysis.newBoundaryFact(n));
+            result.setOutFact(n, analysis.newBoundaryFact(n));
+        }
     }
 
+    /**
+     * ICFG 过程间常量传播算法实现
+     */
     private void doSolve() {
         // TODO - finish me
+        workList = new ArrayDeque<>();
+        workList.addAll(icfg.getNodes()); // 将所有节点加入工作队列
+        while(!workList.isEmpty()) {
+            // 处理每一个调用点 node
+            Node node = workList.poll();
+            // meet 操作, 不过使用传递边来处理方法调用 (相较于过程内常量传播)
+            for(ICFGEdge<Node> edge: icfg.getInEdgesOf(node)) {
+                analysis.meetInto(analysis.transferEdge(edge, result.getOutFact(edge.getSource())), result.getInFact(node));
+            }
+            // 如果节点的出边信息发生变化，则将所有后继节点加入工作队列
+            if(analysis.transferNode(node, result.getInFact(node), result.getOutFact(node))) {
+                workList.addAll(icfg.getSuccsOf(node));
+            }
+        }
     }
 }

@@ -24,7 +24,7 @@ package pascal.taie.analysis.dataflow.inter;
 
 import pascal.taie.analysis.dataflow.analysis.constprop.CPFact;
 import pascal.taie.analysis.dataflow.analysis.constprop.ConstantPropagation;
-import pascal.taie.analysis.graph.cfg.CFG;
+import pascal.taie.analysis.dataflow.analysis.constprop.Value;
 import pascal.taie.analysis.graph.cfg.CFGBuilder;
 import pascal.taie.analysis.graph.icfg.CallEdge;
 import pascal.taie.analysis.graph.icfg.CallToReturnEdge;
@@ -33,10 +33,13 @@ import pascal.taie.analysis.graph.icfg.ReturnEdge;
 import pascal.taie.config.AnalysisConfig;
 import pascal.taie.ir.IR;
 import pascal.taie.ir.exp.InvokeExp;
+import pascal.taie.ir.exp.LValue;
 import pascal.taie.ir.exp.Var;
 import pascal.taie.ir.stmt.Invoke;
 import pascal.taie.ir.stmt.Stmt;
 import pascal.taie.language.classes.JMethod;
+
+import java.util.Optional;
 
 /**
  * Implementation of interprocedural constant propagation for int values.
@@ -74,39 +77,89 @@ public class InterConstantPropagation extends
         cp.meetInto(fact, target);
     }
 
+    /**
+     * 有调用点的传递点处理方法
+     */
     @Override
     protected boolean transferCallNode(Stmt stmt, CPFact in, CPFact out) {
         // TODO - finish me
-        return false;
+        // 因为有调用点, 所有 out = in
+        return out.copyFrom(in);
     }
 
+    /**
+     * 没有调用点的传递点处理方法
+     */
     @Override
     protected boolean transferNonCallNode(Stmt stmt, CPFact in, CPFact out) {
         // TODO - finish me
-        return false;
+        // 没有调用点, 所以直接调用 ConstantPropagation 的 transferNode 方法
+        return cp.transferNode(stmt, in, out);
     }
 
+    /**
+     * Normal Edge 的传递边处理方法
+     */
     @Override
     protected CPFact transferNormalEdge(NormalEdge<Stmt> edge, CPFact out) {
         // TODO - finish me
-        return null;
+        // 普通边, 与过程间调用无关, 前后相等
+        return out;
     }
 
+    /**
+     * Call-To-Return Edge 的传递边处理方法
+     */
     @Override
     protected CPFact transferCallToReturnEdge(CallToReturnEdge<Stmt> edge, CPFact out) {
         // TODO - finish me
-        return null;
+        // FIXME: 重新创建一份, 不要修改原来的 out (不然有些测试点过不去)
+        CPFact copy = out.copy();
+        Optional<LValue> def = edge.getSource().getDef(); // 获取调用点的左值
+        // 如果调用点左侧(左值)有变量, 则删除 fact 中的该变量
+        if(def.isPresent() && def.get() instanceof Var lv) {
+            copy.remove(lv);
+        }
+        return copy;
     }
 
+    /**
+     * Call Edge 的传递边处理方法
+     */
     @Override
     protected CPFact transferCallEdge(CallEdge<Stmt> edge, CPFact callSiteOut) {
         // TODO - finish me
-        return null;
+        JMethod callee = edge.getCallee(); // 被调用的方法
+        Stmt stmt = edge.getSource(); // 调用点
+        CPFact fact = new CPFact();
+        if(stmt instanceof Invoke invoke) {
+            InvokeExp rValue = invoke.getRValue(); // 调用点的右值
+            // 遍历被调用方法的实参
+            for(int i = 0; i < rValue.getArgCount(); i++) {
+                Var arg = rValue.getArg(i);
+                // 更新 fact 相应形参的值 (为对应实参的指)
+                fact.update(callee.getIR().getParam(i), callSiteOut.get(arg));
+            }
+        }
+        return fact;
     }
 
+    /**
+     * Return Edge 的传递边处理方法
+     */
     @Override
     protected CPFact transferReturnEdge(ReturnEdge<Stmt> edge, CPFact returnOut) {
         // TODO - finish me
-        return null;
+        CPFact fact = new CPFact();
+        Optional<LValue> def = edge.getCallSite().getDef(); // 调用点的左值
+        if(def.isPresent()) {
+            // 初始化返回值变量 (注意应该为 UNDEF 类型)
+            Value v = Value.getUndef();
+            // 遍历被调用方法的所有可能的返回值, 按照格理论进行合并
+            for(Var var: edge.getReturnVars()) v = cp.meetValue(v, returnOut.get(var));
+            // 如果调用点左侧有变量, 则更新该变量的值
+            if(def.get() instanceof Var lv) fact.update(lv, v);
+        }
+        return fact;
     }
 }
