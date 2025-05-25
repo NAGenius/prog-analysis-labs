@@ -40,21 +40,33 @@ public class _1TypeSelector implements ContextSelector {
         return ListContext.make();
     }
 
+    /**
+     * 为方法调用选择上下文
+     */
     @Override
     public Context selectContext(CSCallSite callSite, JMethod callee) {
         // TODO - finish me
-        return null;
+        // 使用调用点上下文作为 1-type 敏感度的上下文标识
+        return callSite.getContext();
     }
 
+    /**
+     * 为实例方法调用选择上下文
+     */
     @Override
     public Context selectContext(CSCallSite callSite, CSObj recv, JMethod callee) {
         // TODO - finish me
-        return null;
+        // 使用接收者对象类型作为 1-type 敏感度的上下文标识
+        return ListContext.make(recv.getObject().getContainerType());
     }
 
+    /**
+     * 为堆对象选择上下文
+     */
     @Override
     public Context selectHeapContext(CSMethod method, Obj obj) {
         // TODO - finish me
-        return null;
+        // 堆对象采用空上下文
+        return getEmptyContext();
     }
 }

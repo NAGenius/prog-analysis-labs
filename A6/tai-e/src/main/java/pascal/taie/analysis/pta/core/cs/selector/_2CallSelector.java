@@ -41,21 +41,51 @@ public class _2CallSelector implements ContextSelector {
         return ListContext.make();
     }
 
+    /**
+     * 为方法调用选择上下文
+     */
     @Override
     public Context selectContext(CSCallSite callSite, JMethod callee) {
         // TODO - finish me
-        return null;
+        Context context = callSite.getContext(); // 获取调用点的上下文
+        int len = context.getLength(); // 获取调用点的上下文长度
+        if(len > 0) {
+            return ListContext.make(context.getElementAt(len - 1), callSite.getCallSite()); // 上下文长度大于 0, 返回调用点最近的一个上下文和调用点
+        }
+        else {
+            return ListContext.make(callSite.getCallSite()); // 上下文长度等于 0, 返回调用点
+        }
     }
 
+    /**
+     * 为实例方法调用选择上下文
+     */
     @Override
     public Context selectContext(CSCallSite callSite, CSObj recv, JMethod callee) {
         // TODO - finish me
-        return null;
+        Context context = callSite.getContext(); // 获取调用点的上下文
+        int len = context.getLength(); // 获取调用点的上下文长度
+        if(len > 0) {
+            return ListContext.make(context.getElementAt(len - 1), callSite.getCallSite()); // 上下文长度大于 0, 返回调用点最近的一个上下文和调用点
+        }
+        else {
+            return ListContext.make(callSite.getCallSite()); // 上下文长度等于 0, 返回调用点
+        }
     }
 
+    /**
+     * 为堆对象选择上下文
+     */
     @Override
     public Context selectHeapContext(CSMethod method, Obj obj) {
         // TODO - finish me
-        return null;
+        Context context = method.getContext(); // 获取方法上下文
+        int len = context.getLength(); // 获取方法上下文长度
+        if(len > 0) {
+            return ListContext.make(context.getElementAt(len - 1)); // 上下文长度大于 0, 仅返回最近的一个方法上下文
+        }
+        else {
+            return getEmptyContext(); // 上下文长度等于 0, 返回空的上下文
+        }
     }
 }

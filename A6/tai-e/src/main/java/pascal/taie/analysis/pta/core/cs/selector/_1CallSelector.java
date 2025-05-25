@@ -40,21 +40,33 @@ public class _1CallSelector implements ContextSelector {
         return ListContext.make();
     }
 
+    /**
+     * 为方法调用选择上下文
+     */
     @Override
     public Context selectContext(CSCallSite callSite, JMethod callee) {
         // TODO - finish me
-        return null;
+        // 使用调用点作为 1-call-site 敏感度的上下文标识
+        return ListContext.make(callSite.getCallSite());
     }
 
+    /**
+     * 为实例方法调用选择上下文
+     */
     @Override
     public Context selectContext(CSCallSite callSite, CSObj recv, JMethod callee) {
         // TODO - finish me
-        return null;
+        // 1-call-site 策略下，忽略接收者对象，仅保留最近调用站点
+        return ListContext.make(callSite.getCallSite());
     }
 
+    /**
+     * 为堆对象选择上下文
+     */
     @Override
     public Context selectHeapContext(CSMethod method, Obj obj) {
         // TODO - finish me
-        return null;
+        // 堆对象采用空上下文(对一层调用点敏感, 堆上下文的层数为 0(即没有堆上下文))
+        return getEmptyContext();
     }
 }
